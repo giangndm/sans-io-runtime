@@ -1,5 +1,13 @@
+use futures::Stream;
 use parking_lot::RwLock;
-use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    hash::Hash,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 mod leg;
 mod local_hub;
@@ -107,6 +115,19 @@ impl<ChannelId, MSG, const STACK_SIZE: usize> BusWorker<ChannelId, MSG, STACK_SI
 
     pub fn set_awaker(&self, awaker: Arc<dyn Awaker>) {
         self.receiver.set_awaker(awaker);
+    }
+}
+
+impl<ChannelId, MSG, const STACK_SIZE: usize> Stream for BusWorker<ChannelId, MSG, STACK_SIZE> {
+    type Item = (BusEventSource<ChannelId>, MSG);
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(out) = self.receiver.recv() {
+            Poll::Ready(Some(out))
+        } else {
+            self.receiver.set_async_waker(cx.waker().clone());
+            Poll::Pending
+        }
     }
 }
 

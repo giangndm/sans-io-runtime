@@ -1,5 +1,5 @@
 use parking_lot::Mutex;
-use std::sync::Arc;
+use std::{sync::Arc, task::Waker};
 
 use crate::{backend::Awaker, collections::DynamicDeque};
 
@@ -19,6 +19,7 @@ pub enum BusLegSenderErr {
 
 struct QueueInternal<ChannelId, MSG, const STATIC_SIZE: usize> {
     awaker: Option<Arc<dyn Awaker>>,
+    async_waker: Option<Waker>,
     queue: DynamicDeque<(BusEventSource<ChannelId>, MSG), STATIC_SIZE>,
 }
 
@@ -28,6 +29,7 @@ impl<ChannelId, MSG, const STATIC_SIZE: usize> Default
     fn default() -> Self {
         Self {
             awaker: None,
+            async_waker: None,
             queue: DynamicDeque::default(),
         }
     }
@@ -60,6 +62,9 @@ impl<ChannelId, MSG, const STATIC_SIZE: usize> QueueInternal<ChannelId, MSG, STA
         if after == 1 {
             if let Some(awaker) = self.awaker.as_ref() {
                 awaker.awake();
+            }
+            if let Some(waker) = self.async_waker.take() {
+                waker.wake()
             }
         }
         Ok(after)
@@ -108,6 +113,10 @@ impl<ChannelId, MSG, const STATIC_SIZE: usize> SharedBusQueue<ChannelId, MSG, ST
 
     fn set_awaker(&self, awaker: Arc<dyn Awaker>) {
         self.queue.lock().awaker = Some(awaker);
+    }
+
+    fn set_async_waker(&self, waker: Waker) {
+        self.queue.lock().async_waker = Some(waker);
     }
 }
 
@@ -186,6 +195,10 @@ impl<ChannelId, MSG, const STATIC_SIZE: usize> BusLegReceiver<ChannelId, MSG, ST
 
     pub fn set_awaker(&self, awaker: Arc<dyn Awaker>) {
         self.queue.set_awaker(awaker);
+    }
+
+    pub fn set_async_waker(&self, waker: Waker) {
+        self.queue.set_async_waker(waker);
     }
 }
 

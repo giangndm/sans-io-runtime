@@ -2,6 +2,13 @@ use std::{marker::PhantomData, time::Instant};
 
 use crate::{collections::DynamicVec, Task, TaskSwitcher, TaskSwitcherChild};
 
+use super::TaskError;
+
+pub enum TaskGroupError {
+    Task(TaskError),
+    NotFound,
+}
+
 /// Represents a group of tasks.
 pub struct TaskGroup<In, Out, T: Task<In, Out>, const STACK_SIZE: usize> {
     tasks: DynamicVec<Option<T>, STACK_SIZE>,
@@ -63,26 +70,38 @@ impl<In, Out, T: Task<In, Out>, const STACK_SIZE: usize> TaskGroup<In, Out, T, S
         self.switcher.flag_all();
         for index in 0..self.switcher.tasks() {
             if let Some(Some(task)) = self.tasks.get_mut(index) {
-                task.on_tick(now);
+                if let Err(e) = task.on_tick(now) {
+                    log::error!("TaskGroup {index} on_tick error: {e:?}");
+                }
             }
         }
     }
 
     /// Send event to correct task with index
-    pub fn on_event(&mut self, now: Instant, index: usize, input: In) -> Option<()> {
-        let task = self.tasks.get_mut(index)?.as_mut()?;
+    pub fn on_event(
+        &mut self,
+        now: Instant,
+        index: usize,
+        input: In,
+    ) -> Result<(), TaskGroupError> {
+        let task = self.tasks.get_mut(index).ok_or(TaskGroupError::NotFound)?;
         self.switcher.flag_task(index);
-        task.on_event(now, input);
-        Some(())
+        task.as_mut()
+            .ok_or(TaskGroupError::NotFound)?
+            .on_event(now, input)
+            .map_err(|e| TaskGroupError::Task(e))?;
+        Ok(())
     }
 
     /// Gracefully destroys the task group.
-    pub fn on_shutdown(&mut self, now: Instant) {
+    pub fn shutdown(&mut self, now: Instant) {
         self.switcher.flag_all();
         for index in 0..self.switcher.tasks() {
             log::info!("Group kill tasks {}/{}", index, self.switcher.tasks());
             if let Some(Some(task)) = self.tasks.get_mut(index) {
-                task.on_shutdown(now);
+                if let Err(e) = task.shutdown(now) {
+                    log::error!("TaskGroup {index} shutdown error: {e:?}");
+                }
             }
         }
     }

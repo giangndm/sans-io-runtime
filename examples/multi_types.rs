@@ -85,11 +85,17 @@ impl Task1 {
 }
 
 impl Task<(), ()> for Task1 {
-    fn on_tick(&mut self, _now: Instant) {}
+    fn on_tick(&mut self, _now: Instant) -> Result<(), TaskError> {
+        Ok(())
+    }
 
-    fn on_event(&mut self, _now: Instant, _input: ()) {}
+    fn on_event(&mut self, _now: Instant, _input: ()) -> Result<(), TaskError> {
+        Ok(())
+    }
 
-    fn on_shutdown(&mut self, _now: Instant) {}
+    fn shutdown(&mut self, _now: Instant) -> Result<(), TaskError> {
+        Ok(())
+    }
 }
 
 impl TaskSwitcherChild<()> for Task1 {

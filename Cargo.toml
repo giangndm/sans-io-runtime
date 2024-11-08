@@ -13,18 +13,19 @@ derive_more = "0.99"
 heapless = "0.8"
 log = "0.4"
 parking_lot = "0.12"
-convert-enum = "0.1.0"
-num_enum = "0.7.2"
+convert-enum = "0.1"
+num_enum = "0.7"
 polling = { version = "3.5", optional = true }
 socket2 = { version = "0.5", optional = true, features = ["all"] }
 tun = { version = "0.6", optional = true }
+futures = "0.3"
 
 [dev-dependencies]
 mockall = "0.12.1"
 env_logger = "0.11"
 tiny_http = "0.12"
 str0m = "0.6"
-signal-hook = "0.3.17"
+signal-hook = "0.3"
 
 [features]
 default = ["poll-backend", "polling-backend", "udp"]
